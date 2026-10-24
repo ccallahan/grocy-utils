@@ -1,0 +1,78 @@
+name: Import reels into Grocy
+
+on:
+  push:
+    paths:
+      - links.txt
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "Process every link in links.txt (not just newly added ones)"
+        type: boolean
+        default: false
+
+# Never run two imports at once, or they could both create the same products
+concurrency:
+  group: import-reels
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          pip install -r requirements.txt
+
+      - name: Find new links
+        id: links
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          ALL: ${{ github.event_name == 'workflow_dispatch' && inputs.all }}
+        run: |
+          if [ "$ALL" = "true" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            # Manual full run, first push, or force-push: use the whole file
+            cp links.txt "$RUNNER_TEMP/new_links.txt"
+          else
+            git diff --unified=0 "$BEFORE" "$AFTER" -- links.txt \
+              | grep -E '^\+[^+]' | sed 's/^+//' > "$RUNNER_TEMP/new_links.txt" || true
+          fi
+          grep -vE '^\s*(#|$)' "$RUNNER_TEMP/new_links.txt" > "$RUNNER_TEMP/links_clean.txt" || true
+          count=$(wc -l < "$RUNNER_TEMP/links_clean.txt" | tr -d ' ')
+          echo "Found $count new link(s):"
+          cat "$RUNNER_TEMP/links_clean.txt"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Write Facebook cookies
+        if: steps.links.outputs.count != '0'
+        env:
+          FACEBOOK_COOKIES: ${{ secrets.FACEBOOK_COOKIES }}
+        run: |
+          if [ -n "$FACEBOOK_COOKIES" ]; then
+            printf '%s\n' "$FACEBOOK_COOKIES" > "$RUNNER_TEMP/cookies.txt"
+            echo "COOKIES_ARG=--cookies $RUNNER_TEMP/cookies.txt" >> "$GITHUB_ENV"
+          fi
+
+      - name: Import recipes
+        if: steps.links.outputs.count != '0'
+        env:
+          GROCY_URL: ${{ secrets.GROCY_URL }}
+          GROCY_API_KEY: ${{ secrets.GROCY_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python reel_to_recipe.py -f "$RUNNER_TEMP/links_clean.txt" $COOKIES_ARG
+
+      - name: Clean up cookies
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cookies.txt"

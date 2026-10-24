@@ -1,0 +1,16 @@
+# One Facebook reel URL per line. Lines starting with # are ignored.
+https://www.facebook.com/reel/712017508599896
+https://www.facebook.com/reel/1479971243865523
+https://www.facebook.com/reel/1623722195574040
+https://www.facebook.com/reel/1832586284208645
+https://www.facebook.com/reel/1219141950089556
+https://www.facebook.com/reel/850013924775314
+https://www.facebook.com/reel/4317143675273168
+https://www.facebook.com/reel/2335265580271350
+https://www.facebook.com/reel/1233881832146223
+https://www.facebook.com/reel/1780805849764157
+https://www.facebook.com/reel/1370130481393372
+https://www.facebook.com/reel/1432829825464474
+https://www.facebook.com/reel/2238196913671940
+https://www.facebook.com/reel/1739901250582970
+https://www.facebook.com/reel/3396131647235388
